@@ -1,0 +1,3 @@
+-changed Tprop to CTL Prop
+-worlds stored in list of (node, node)
+-getWorlds uses the path operators to check worlds
