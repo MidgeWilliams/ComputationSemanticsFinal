@@ -10,12 +10,13 @@ data PathOperator =  E | A | N deriving (Show, Eq)
 
 data BranchOperator = X | W | F | G deriving (Show, Eq)
 -- Tree Structure
-data WorldNode = WorldNode { worldD :: World, branches :: [WorldNode], parent :: Maybe WorldNode} deriving (Show, Eq)
-
+data WorldNode = WorldNode { worldD :: World, branches :: [WorldNode], parent :: Maybe WorldNode} deriving (Eq)
+instance Show WorldNode where
+  show wn = show (worldN (worldD wn))++"\n"
 data CTLProp = CTLProp { pathOp :: PathOperator, branchOp :: BranchOperator,
               prop ::  [Prop] } deriving (Show, Eq)
 
-data World = World { propositions :: [Prop] } deriving (Show, Eq)
+data World = World { propositions :: [Prop], worldN :: Int } deriving (Show, Eq)
 
 w1 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -29,7 +30,7 @@ w1 =  World { propositions = [
  "the dwarves laugh",
  "the boys admire me",
  "alice defeats alice"
-]}
+], worldN = 1}
 
 w2 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -42,7 +43,7 @@ w2 =  World { propositions = [
  "the women love the men",
  "the dwarves laugh",
  "the boys admire me"
-]}
+], worldN = 2}
 
 w3 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -55,7 +56,7 @@ w3 =  World { propositions = [
  "the women love the men",
  "the dwarves laugh",
  "the boys admire me"
-]}
+], worldN = 3}
 
 w4 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -68,7 +69,7 @@ w4 =  World { propositions = [
  "the women love the men",
  "the girls love the dwarves",
  "he kicks himself"
-]}
+], worldN = 4}
 
 w5 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -81,7 +82,7 @@ w5 = World { propositions = [
  "the women love the men",
  "the girls love the dwarves",
  "he kicks himself"
-]}
+], worldN = 5}
 
 w6 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -94,7 +95,7 @@ w6 = World { propositions = [
  "the women love the men",
  "the girls love the dwarves",
  "he kicks himself"
-]}
+], worldN = 6}
 
 w7 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -107,7 +108,7 @@ w7 = World { propositions = [
  "the boys love the girls",
  "the girls love the dwarves",
  "the boys admire me"
-]}
+], worldN = 7}
 
 w8 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -120,7 +121,7 @@ w8 = World { propositions = [
  "the boys love the girls",
  "the girls love the dwarves",
  "the boys admire me"
-]}
+], worldN = 8}
 
 w9 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -133,7 +134,7 @@ w9 = World { propositions = [
  "the boys love the girls",
  "the girls love the dwarves",
  "the boys admire me"
-]}
+], worldN = 9}
 
 w10 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -147,7 +148,7 @@ w10 = World { propositions = [
  "the boys love the girls",
  "the dwarves laugh",
  "he kicks himself"
-]}
+], worldN = 10}
 
 w11 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -160,7 +161,7 @@ w11 = World { propositions = [
  "the boys love the girls",
  "the dwarves laugh",
  "he kicks himself"
-]}
+], worldN = 11}
 
 w12 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
@@ -173,7 +174,7 @@ w12 = World { propositions = [
  "the boys love the girls",
  "the dwarves laugh",
  "he kicks himself"
-]}
+], worldN = 12}
 
 -- model = [(w1, w2), (w2, w3), (w3, w4), (w3, w5), (w3, w6), (w4, w7), (w5, w8), (w6, w9), (w6, w10), (w7, w11), (w7, w12)]
 
@@ -186,7 +187,7 @@ mn7 = WorldNode{worldD=w7,branches = [mn11,mn12], parent = Just mn4}
 mn6 = WorldNode{worldD=w6,branches = [mn9,mn10], parent = Just mn3}
 mn5 = WorldNode{worldD=w5,branches = [mn8], parent = Just mn3}
 mn4 = WorldNode{worldD=w4,branches = [mn7], parent = Just mn3}
-mn3 = WorldNode{worldD=w7,branches = [mn4,mn5,mn6], parent = Just mn2}
+mn3 = WorldNode{worldD=w3,branches = [mn4,mn5,mn6], parent = Just mn2}
 mn2 = WorldNode{worldD=w2,branches = [mn3], parent = Just mn1}
 mn1 = WorldNode{worldD=w1,branches = [mn2], parent = Nothing}
 
@@ -226,7 +227,7 @@ testWorlds w ctl
 -- NOTE:to affect how tenses are handled modify checkValidW
 checkWorld ctl world
   | brancho == G = (checkTenseValidW (head (prop ctl)) world) && all (checkWorld ctl) (branches world)
-  | brancho == F = final_w world ctl (branches world)
+  | brancho == F = (checkTenseValidW (head (prop ctl)) world) || any (checkWorld ctl) (branches world)
   | brancho == X = (checkValidW (head (prop ctl))) (worldD world)
   | brancho == W = ((eval_p (head (prop ctl))) && any (checkWorld ctl) (branches world)) || (eval_p (last (prop ctl)))
   | otherwise = undefined
@@ -260,7 +261,7 @@ comparePM p1 p2 = (fc p1== fc p2) && (compareV (vc p1) (vc p2))
 
 -- fWorldsT :: Prop -> WorldNode -> [World] --finds what worlds the present form must be true in
 fWorldsT pro w
-  | te == Fut = undefined
+  | te == Fut = map (worldD) (getFuture w)
   | te == Pres = [worldD w]
   | te == Past || te == Perf = getPast (parent w)
   where
@@ -268,6 +269,8 @@ fWorldsT pro w
 
 getPast Nothing = []
 getPast (Just par) = [worldD par] ++ (getPast (parent par))
+
+getFuture w = (branches w)++(concat[getFuture b | b <- (branches w)])
 
 checkValidW :: String -> World -> Bool
 checkValidW pro w = any (comparePM pro) (propositions w) --checks a world
@@ -297,3 +300,4 @@ e5 = isSatisfied (CTLProp E F ["she cheers"]) mn2
 e6 = isSatisfied (CTLProp E F ["the men cheer"]) mn5
 e7 = isSatisfied (CTLProp E W ["i love alice","alice loves the boy"]) mn3
 e8 = isSatisfied (CTLProp A G ["alice defeated alice"]) mn10
+e9 = isSatisfied (CTLProp A G ["the giants will_help the princess"]) mn1
