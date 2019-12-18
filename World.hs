@@ -23,6 +23,7 @@ data World = World { propositions :: [Prop], worldN :: Int } deriving (Show, Eq)
 w1 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
  "the girl loves the daggers",
+ "alice kicks the wizard",
  "i love alice",
  "the dwarf sells the dagger to a boy",
  "i take several things",
@@ -210,6 +211,7 @@ kick    = Verb ["kicked","will_kick","kick","kicks","have_kicked","has_kicked"]
 takeV   = Verb ["took","will_take","take","takes","has_taken","have_taken"]
 laugh   = Verb ["laugh","laughs","laughed","will_laugh","has_laughed","have_laughed"]
 verbs = [smile,cheer,shudder,love,admire,help,defeat,give,sell,kick,takeV,laugh]
+nodes = [mn1,mn2,mn3,mn4,mn5,mn6,mn7,mn8,mn9,mn10,mn11,mn12]
 model = [w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12]
 invalidProps =  [[p | p <- propositions x, (parses p) == []] | x <- model]
 
@@ -220,6 +222,7 @@ invalidProps =  [[p | p <- propositions x, (parses p) == []] | x <- model]
 --
 
 -- checks over all paths
+testWorlds :: WorldNode -> CTLNProp -> Bool
 testWorlds w ctl
   | patho == E = (any (checkWorld ctl) (branches w))
   | patho == A = (all (checkWorld ctl) (branches w))
@@ -237,18 +240,17 @@ nCheckWorld x xs pro world
   | brancho == G = (nTestWorlds xs world pro) && all (nCheckWorld x xs pro) (branches world)
   | brancho == F = (nTestWorlds xs world pro) || any (nCheckWorld x xs pro) (branches world)
   | brancho == X = (nTestWorlds xs world pro)
-  -- | brancho == W = ((eval_p (head (prop ctl))) && any (nCheckWorld x nctl) (branches world)) || (eval_p (last (prop ctl)))
+  | brancho == W = undefined
   | otherwise = undefined
   where
     brancho = (branchOp x)
     -- eval_p  = (\p -> (checkValidW (p) (worldD world)))
 
-
--- NOTE:to affect how tenses are handled modify checkValidW
+checkWorld :: CTLNProp -> WorldNode -> Bool
 checkWorld ctl world
   | brancho == G = (checkTenseValidW (head (prop ctl)) world) && all (checkWorld ctl) (branches world)
   | brancho == F = (checkTenseValidW (head (prop ctl)) world) || any (checkWorld ctl) (branches world)
-  | brancho == X = (checkValidW (head (prop ctl))) (worldD world)
+  | brancho == X = (checkTenseValidW (head (prop ctl))) world
   | brancho == W = ((eval_p (head (prop ctl))) && any (checkWorld ctl) (branches world)) || (eval_p (last (prop ctl)))
   | otherwise = undefined
   where
@@ -264,19 +266,18 @@ getTense p = head (last [fs c | c <- cats, phon c /= "_"])
     cats = [t2c t | t <-subtrees parse, catLabel (t2c t) == "VP"]
 --
 -- TODO:improve complexity of finding tense
-compareV :: String -> String -> Bool --checks if two verbs are different forms of the same meaning
+compareV :: Prop -> Prop -> Bool --checks if two verbs are different forms of the same meaning
 compareV v1 v2 = any (\v-> v1 `elem`forms v && v2 `elem` forms v) verbs
 
 -- checks if two phrases have the same meaning at different times
-comparePM :: String -> String -> Bool
--- comparePM s1 s2 = s1 == s2
--- comparePM s1 s2 = True
+comparePM :: Prop -> Prop -> Bool
 comparePM p1 p2 = (fc p1== fc p2) && (compareV (vc p1) (vc p2))
   where
     fc = (\p -> [t2c t | t <-subtrees (head (parses p)), catLabel (t2c t) /= "VP"])
     vc = (\p -> [phon (t2c t) | t <-subtrees (parses p !! 0), catLabel (t2c t) == "VP" && phon (t2c t) /= "_"] !! 0)
 
 -- fWorldsT :: Prop -> WorldNode -> [World] --finds what worlds the present form must be true in
+fWorldsT :: [Char] -> WorldNode -> [World]
 fWorldsT pro w
   | te == Fut = undefined
   | te == Pres = [worldD w]
@@ -284,6 +285,7 @@ fWorldsT pro w
   where
     te = getTense pro
 
+getPast :: Maybe WorldNode -> [World]
 getPast Nothing = []
 getPast (Just par) = [worldD par] ++ (getPast (parent par))
 
@@ -300,11 +302,11 @@ isSatisfied ctlProp w = nTestWorlds ops w pro
 
 
 isSatisfiable :: CTLNProp -> Bool
-isSatisfiable ctlProp = undefined
+isSatisfiable ctlProp = any (isSatisfied ctlProp) nodes
 
 
 isValid :: CTLNProp -> Bool
-isValid ctlProp = undefined
+isValid ctlProp = all (isSatisfied ctlProp) nodes
 
 --The different function just change the set of worlds that step 1 is applied over
 --satifiable just checks if any world is the CTLProp satisfied for that world
@@ -312,6 +314,8 @@ isValid ctlProp = undefined
 ne1 = isSatisfied (CTLNProp [Ops E X] ["the giants help the princess"]) mn3 --True
 ne2 = isSatisfied (CTLNProp [Ops E X, Ops E X]["alice smiles"]) mn1 --True 1 -> 2 -> 3
 ne3 = isSatisfied (CTLNProp [Ops E X, Ops A X]["she cheers"]) mn4 --True 4 -> 7 -> (11,12)
+ne4 = isSatisfied (CTLNProp [Ops A F] ["i loved alice"])
+ne5 = isValid (CTLNProp [Ops E F] ["alice kicked the wizard"])
 -- e2 = isSatisfied (CTLProp A X ["the wizard laughs"]) mn3
 -- e3 = isSatisfied (CTLProp E X ["the wizard laughs"]) mn5
 -- e4 = isSatisfied (CTLProp A X ["the giants help the princess"]) mn3
