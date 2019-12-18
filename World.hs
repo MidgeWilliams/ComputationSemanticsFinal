@@ -10,7 +10,7 @@ data PathOperator =  E | A | N deriving (Show, Eq)
 
 data BranchOperator = X | W | F | G deriving (Show, Eq)
 -- Tree Structure
-data WorldNode = WorldNode { worldD :: World, branches :: [WorldNode]} deriving (Show, Eq)
+data WorldNode = WorldNode { worldD :: World, branches :: [WorldNode], parent :: Maybe WorldNode} deriving (Show, Eq)
 
 data CTLProp = CTLProp { pathOp :: PathOperator, branchOp :: BranchOperator,
               prop ::  [Prop] } deriving (Show, Eq)
@@ -27,7 +27,8 @@ w1 =  World { propositions = [
  "Goldilocks helps herself",
  "the women love the men",
  "the dwarves laugh",
- "the boys admire me"
+ "the boys admire me",
+ "alice defeats alice"
 ]}
 
 w2 =  World { propositions = [
@@ -137,6 +138,7 @@ w9 = World { propositions = [
 w10 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
  "Alice defeats the princesses",
+ "Alice defeats Alice",
  "many princesses admire the wizards",
  "many girls admire these women",
  "the dagger shudders",
@@ -175,18 +177,18 @@ w12 = World { propositions = [
 
 -- model = [(w1, w2), (w2, w3), (w3, w4), (w3, w5), (w3, w6), (w4, w7), (w5, w8), (w6, w9), (w6, w10), (w7, w11), (w7, w12)]
 
-mn12 = WorldNode{worldD=w12,branches = []}
-mn11 = WorldNode{worldD=w11,branches = []}
-mn10 = WorldNode{worldD=w10,branches = []}
-mn9 = WorldNode{worldD=w9,branches = []}
-mn8 = WorldNode{worldD=w8,branches = []}
-mn7 = WorldNode{worldD=w7,branches = [mn11,mn12]}
-mn6 = WorldNode{worldD=w6,branches = [mn9,mn10]}
-mn5 = WorldNode{worldD=w5,branches = [mn8]}
-mn4 = WorldNode{worldD=w4,branches = [mn7]}
-mn3 = WorldNode{worldD=w7,branches = [mn4,mn5,mn6]}
-mn2 = WorldNode{worldD=w2,branches = [mn3]}
-mn1 = WorldNode{worldD=w1,branches = [mn2]}
+mn12 = WorldNode{worldD=w12,branches = [], parent = Just mn7}
+mn11 = WorldNode{worldD=w11,branches = [], parent = Just mn7}
+mn10 = WorldNode{worldD=w10,branches = [], parent = Just mn6}
+mn9 = WorldNode{worldD=w9,branches = [], parent = Just mn6}
+mn8 = WorldNode{worldD=w8,branches = [], parent = Just mn5}
+mn7 = WorldNode{worldD=w7,branches = [mn11,mn12], parent = Just mn4}
+mn6 = WorldNode{worldD=w6,branches = [mn9,mn10], parent = Just mn3}
+mn5 = WorldNode{worldD=w5,branches = [mn8], parent = Just mn3}
+mn4 = WorldNode{worldD=w4,branches = [mn7], parent = Just mn3}
+mn3 = WorldNode{worldD=w7,branches = [mn4,mn5,mn6], parent = Just mn2}
+mn2 = WorldNode{worldD=w2,branches = [mn3], parent = Just mn1}
+mn1 = WorldNode{worldD=w1,branches = [mn2], parent = Nothing}
 
 -- model = [(w1,[w2]), (w2,[w3]), (w3, [w4,w5,w6]), (w4,[w7]), (w5, w8), (w6, [w9, w10]) ]
 -- TODO: imporve complexity of form matching
@@ -223,7 +225,7 @@ testWorlds w ctl
 
 -- NOTE:to affect how tenses are handled modify checkValidW
 checkWorld ctl world
-  | brancho == G = (checkValidW (head (prop ctl)) (worldD world)) && all (checkWorld ctl) (branches world)
+  | brancho == G = (checkTenseValidW (head (prop ctl)) world) && all (checkWorld ctl) (branches world)
   | brancho == F = final_w world ctl (branches world)
   | brancho == X = (checkValidW (head (prop ctl))) (worldD world)
   | brancho == W = ((eval_p (head (prop ctl))) && any (checkWorld ctl) (branches world)) || (eval_p (last (prop ctl)))
@@ -237,11 +239,11 @@ final_w _ ctl xs = any (checkWorld ctl) xs
 
 
 
--- getTense :: Prop -> Feat
--- getTense p = head (last [fs c | c <- cats, phon c /= "_"])
---   where
---     parse = head (parses p)
---     cats = [t2c t | t <-subtrees parse, catLabel (t2c t) == "VP"]
+getTense :: Prop -> Feat
+getTense p = head (last [fs c | c <- cats, phon c /= "_"])
+  where
+    parse = head (parses p)
+    cats = [t2c t | t <-subtrees parse, catLabel (t2c t) == "VP"]
 --
 -- TODO:improve complexity of finding tense
 compareV :: String -> String -> Bool --checks if two verbs are different forms of the same meaning
@@ -255,18 +257,22 @@ comparePM p1 p2 = (fc p1== fc p2) && (compareV (vc p1) (vc p2))
   where
     fc = (\p -> [t2c t | t <-subtrees (head (parses p)), catLabel (t2c t) /= "VP"])
     vc = (\p -> [phon (t2c t) | t <-subtrees (parses p !! 0), catLabel (t2c t) == "VP" && phon (t2c t) /= "_"] !! 0)
---
--- fWorldsT :: Feat -> World -> [World] --finds what worlds the present form must be true in
--- fWorldsT te w = [w]
---
---
---
+
+-- fWorldsT :: Prop -> WorldNode -> [World] --finds what worlds the present form must be true in
+fWorldsT pro w
+  | te == Fut = undefined
+  | te == Pres = [worldD w]
+  | te == Past || te == Perf = getPast (parent w)
+  where
+    te = getTense pro
+
+getPast Nothing = []
+getPast (Just par) = [worldD par] ++ (getPast (parent par))
+
 checkValidW :: String -> World -> Bool
 checkValidW pro w = any (comparePM pro) (propositions w) --checks a world
 --
--- checkTenseWorlds :: String -> Feat -> World -> Bool
--- checkTenseWorlds pro te w = any (checkValidW pro) (fWorldsT te w)
-
+checkTenseValidW pro wn = any (checkValidW pro) (fWorldsT pro wn)
 
 isSatisfied :: CTLProp -> WorldNode -> Bool
 isSatisfied ctlProp w = testWorlds w ctlProp
@@ -286,6 +292,8 @@ e1 = isSatisfied (CTLProp E X ["the giants help the princess"]) mn3
 e2 = isSatisfied (CTLProp A X ["the wizard laughs"]) mn3
 e3 = isSatisfied (CTLProp E X ["the wizard laughs"]) mn5
 e4 = isSatisfied (CTLProp A X ["the giants help the princess"]) mn3
+
 e5 = isSatisfied (CTLProp E F ["she cheers"]) mn2
 e6 = isSatisfied (CTLProp E F ["the men cheer"]) mn5
 e7 = isSatisfied (CTLProp E W ["i love alice","alice loves the boy"]) mn3
+e8 = isSatisfied (CTLProp A G ["alice defeated alice"]) mn10
