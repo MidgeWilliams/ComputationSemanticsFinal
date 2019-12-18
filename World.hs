@@ -19,7 +19,7 @@ data World = World { propositions :: [Prop] } deriving (Show, Eq)
 
 w1 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
- "the girl loves daggers",
+ "the girl loves the daggers",
  "i love alice",
  "the dwarf sells the dagger to a boy",
  "i take several things",
@@ -32,10 +32,10 @@ w1 =  World { propositions = [
 
 w2 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
- "the girl loves daggers",
+ "the girl loves the daggers",
  "i love alice",
  "the dwarf sells the dagger to a boy",
- "you love giants",
+ "you love the giants",
  "many girls admire these women",
  "atreyu smiles",
  "the women love the men",
@@ -45,7 +45,7 @@ w2 =  World { propositions = [
 
 w3 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
- "the girl loves daggers",
+ "the girl loves the daggers",
  "i love alice",
  "the dwarf sells the dagger to a boy",
  "i take several things",
@@ -58,11 +58,11 @@ w3 =  World { propositions = [
 
 w4 =  World { propositions = [
  "some dwarf sells dorothy goldilocks",
- "the girl loves daggers",
+ "the girl loves the daggers",
  "the wizard laughs",
  "i love alice",
  "some boys kick most dwarves",
- "you love giants",
+ "you love the giants",
  "atreyu smiles",
  "the women love the men",
  "the girls love the dwarves",
@@ -97,7 +97,7 @@ w6 = World { propositions = [
 
 w7 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
- "the girl loves daggers",
+ "the girl loves the daggers",
  "The men cheer",
  "alice loves the boy",
  "many girls admire these women",
@@ -149,7 +149,7 @@ w10 = World { propositions = [
 
 w11 = World { propositions = [
  "some dwarf sells dorothy goldilocks",
- "the girl loves daggers",
+ "the girl loves the daggers",
  "Alice defeats the princesses",
  "she cheers",
  "many princesses admire the wizards",
@@ -173,7 +173,7 @@ w12 = World { propositions = [
  "he kicks himself"
 ]}
 
-model = [(w1, w2), (w2, w3), (w3, w4), (w3, w5), (w3, w6), (w4, w7), (w5, w8), (w6, w9), (w6, w10), (w7, w11), (w7, w12)]
+-- model = [(w1, w2), (w2, w3), (w3, w4), (w3, w5), (w3, w6), (w4, w7), (w5, w8), (w6, w9), (w6, w10), (w7, w11), (w7, w12)]
 
 mn12 = WorldNode{worldD=w12,branches = []}
 mn11 = WorldNode{worldD=w11,branches = []}
@@ -202,8 +202,10 @@ give    = Verb ["gave","will_give","give","gives","has_given","have_given"]
 sell    = Verb ["sold","will_sell","sell","sells","has_sold","have_sold"]
 kick    = Verb ["kicked","will_kick","kick","kicks","have_kicked","has_kicked"]
 takeV   = Verb ["took","will_take","take","takes","has_taken","have_taken"]
-verbs = [smile,cheer,shudder,love,admire,help,defeat,give,sell,kick,takeV]
-
+laugh   = Verb ["laugh","laughs","laughed","will_laugh","has_laughed","have_laughed"]
+verbs = [smile,cheer,shudder,love,admire,help,defeat,give,sell,kick,takeV,laugh]
+model = [w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12]
+invalidProps =  [[p | p <- propositions x, (parses p) == []] | x <- model]
 
 -- 3 layers of postioning: tense, temporal operator and function
 -- Steps: 1. determine world(s) to start at   (function)
@@ -219,13 +221,16 @@ testWorlds w ctl
   where
     patho = (pathOp ctl)
 
-
+-- NOTE:to affect how tenses are handled modify checkValidW
 checkWorld ctl world
   | brancho == G = (checkValidW (head (prop ctl)) (worldD world)) && all (checkWorld ctl) (branches world)
   | brancho == F = final_w world ctl (branches world)
+  | brancho == X = (checkValidW (head (prop ctl))) (worldD world)
+  | brancho == W = ((eval_p (head (prop ctl))) && any (checkWorld ctl) (branches world)) || (eval_p (last (prop ctl)))
   | otherwise = undefined
   where
     brancho = branchOp ctl
+    eval_p  = (\p -> (checkValidW (p) (worldD world)))
 
 final_w world ctl [] = (head (prop ctl)) `elem` (propositions (worldD world))
 final_w _ ctl xs = any (checkWorld ctl) xs
@@ -263,9 +268,6 @@ checkValidW pro w = any (comparePM pro) (propositions w) --checks a world
 -- checkTenseWorlds pro te w = any (checkValidW pro) (fWorldsT te w)
 
 
--- NOTE The algorithm is not super efficient and some of the helper methods
--- likely could be refactored
-
 isSatisfied :: CTLProp -> WorldNode -> Bool
 isSatisfied ctlProp w = testWorlds w ctlProp
 
@@ -280,3 +282,10 @@ isValid ctlProp = undefined
 --The different function just change the set of worlds that step 1 is applied over
 --satifiable just checks if any world is the CTLProp satisfied for that world
 --isValid checks for all worlds 
+e1 = isSatisfied (CTLProp E X ["the giants help the princess"]) mn3
+e2 = isSatisfied (CTLProp A X ["the wizard laughs"]) mn3
+e3 = isSatisfied (CTLProp E X ["the wizard laughs"]) mn5
+e4 = isSatisfied (CTLProp A X ["the giants help the princess"]) mn3
+e5 = isSatisfied (CTLProp E F ["she cheers"]) mn2
+e6 = isSatisfied (CTLProp E F ["the men cheer"]) mn5
+e7 = isSatisfied (CTLProp E W ["i love alice","alice loves the boy"]) mn3
