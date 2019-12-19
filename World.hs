@@ -208,6 +208,7 @@ takeV   = Verb ["took","will_take","take","takes","has_taken","have_taken"]
 laugh   = Verb ["laugh","laughs","laughed","will_laugh","has_laughed","have_laughed"]
 verbs = [smile,cheer,shudder,love,admire,help,defeat,give,sell,kick,takeV,laugh]
 model = [w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12]
+node_model = [mn1,mn2,mn3,mn4,mn5,mn6,mn7,mn8,mn9,mn10,mn11,mn12]
 invalidProps =  [[p | p <- propositions x, (parses p) == []] | x <- model]
 
 -- 3 layers of postioning: tense, temporal operator and function
@@ -282,11 +283,11 @@ isSatisfied ctlProp w = testWorlds w ctlProp
 
 
 isSatisfiable :: CTLProp -> Bool
-isSatisfiable ctlProp = undefined
+isSatisfiable ctlProp = any (isSatisfied ctlProp) node_model
 
 
 isValid :: CTLProp -> Bool
-isValid ctlProp = undefined
+isValid ctlProp = all (isSatisfied ctlProp) node_model
 
 --The different function just change the set of worlds that step 1 is applied over
 --satifiable just checks if any world is the CTLProp satisfied for that world
@@ -301,3 +302,4 @@ e6 = isSatisfied (CTLProp E F ["the men cheer"]) mn5
 e7 = isSatisfied (CTLProp E W ["i love alice","alice loves the boy"]) mn3
 e8 = isSatisfied (CTLProp A G ["alice defeated alice"]) mn10
 e9 = isSatisfied (CTLProp A G ["the giants will_help the princess"]) mn1
+examples = [e1,e2,e3,e4,e5,e6,e7,e8,e9]
